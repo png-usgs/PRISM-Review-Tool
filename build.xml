@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- You may freely edit this file. See harness/README in the NetBeans platform -->
+<!-- for some information on what you could do (e.g. targets to override). -->
+<!-- If you delete this file and reopen the project it will be recreated. -->
+<project name="PRISM_Review_Tool" basedir=".">
+    <description>Builds the module suite PRISM Review Tool.</description>
+    <import file="nbproject/build-impl.xml"/>
+    
+    <condition property="isWindows">
+        <os family="windows" />
+    </condition>
+    
+    <!-- Override build target to add app.version to version and title entries -->
+    <target name="build" depends="build-brand,suite.build"/>
+
+    <target name="build-brand" depends="-init">
+        <propertyfile
+            file="${basedir}/branding/core/core.jar/org/netbeans/core/startup/Bundle.properties" 
+            comment="Updated by build script">
+            <entry key="currentVersion" value="${app.title} ${app.version} " />
+        </propertyfile>
+
+        <propertyfile
+            file="${basedir}/branding/modules/org-netbeans-core-windows.jar/org/netbeans/core/windows/view/ui/Bundle.properties"
+            comment="Updated by build script">
+            <entry key="CTL_MainWindow_Title" value="${app.title} ${app.version}" />
+            <entry key="CTL_MainWindow_Title_No_Project" value="${app.title} ${app.version}" />
+        </propertyfile>
+
+        <propertyfile
+            file="${basedir}/branding/modules/org-netbeans-core.jar/org/netbeans/core/ui/Bundle.properties" 
+            comment="Updated by build script">
+            <entry key="LBL_ProductInformation" value="${app.title}" />
+        </propertyfile>
+    </target>
+    
+    <target name="build-launchers" depends="suite.build-launchers">
+        <!-- Replace the icon for the Windows launcher exe. -->
+        <antcall target="replaceWindowsLauncherIcon"/>
+        
+        <!-- Edit Java JVM heap memory requirements in ${app.name}.conf file -->
+        <replace file="build/launcher/etc/${app.name}.conf" token="--branding ${branding.token} -J-Xms24m -J-Xmx64m" value="--branding ${branding.token} -J-Xms128m -J-Xmx512m"/>
+    </target>
+    
+    <!-- Windows-only target that replaces the icon for the launcher exe with our own icon. -->
+    <target name="replaceWindowsLauncherIcon" if="isWindows" description="Replace the icon for the Windows launcher exe">
+        <echo message="Replacing icon of Windows launcher executable."/>
+        <exec executable="ReplaceVistaIcon.exe" resolveexecutable="true">
+            <arg line="build/launcher/bin/${app.name}.exe ${basedir}/prism_review_tool.ico"/>
+        </exec>
+        <exec executable="ReplaceVistaIcon.exe" resolveexecutable="true">
+            <arg line="build/launcher/bin/${app.name}64.exe ${basedir}/prism_review_tool.ico"/>
+        </exec>
+    </target>
+    
+</project>

@@ -1,0 +1,216 @@
+/*******************************************************************************
+ * Name: Java class NavPanel.java
+ * Project: PRISM Review Tool
+ * Written by: Peter Ng, USGS, png@usgs.gov
+ * 
+ * This software is in the public domain because it contains materials that 
+ * originally came from the United States Geological Survey, an agency of the 
+ * United States Department of Interior. For more information, see the official 
+ * USGS copyright policy at 
+ * http://www.usgs.gov/visual-id/credit_usgs.html#copyright
+ * 
+ * Date: first release date Feb. 2015
+ ******************************************************************************/
+
+package gov.usgs.smapp.smactions.navactions;
+
+import gov.usgs.smapp.SmCore;
+import gov.usgs.smapp.VxChartsBinGroup;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import javax.swing.JButton;
+
+/**
+ *
+ * @author png
+ */
+public class NavPanel extends javax.swing.JPanel {
+
+    /**
+     * Creates new form NavPanel
+     */
+    public NavPanel() {
+        initComponents();
+        
+        setupNavPanel();
+    }
+    
+    public JButton getNavFirstBtn() {return this.btnNavFirst;}
+    public JButton getNavPreviousBtn() {return this.btnNavPrevious;}
+    public JButton getNavNextBtn() {return this.btnNavNext;}
+    public JButton getNavLastBtn() {return this.btnNavLast;}
+    public String getNavigationText() {return lblNavDisplay.getText();}
+    public void setNavigationText(String text) {lblNavDisplay.setText(text);}
+    
+    private void setupNavPanel()
+    {
+        BtnNavigationActionListener btnNavigationActionListener = 
+            new BtnNavigationActionListener();
+        btnNavFirst.addActionListener(btnNavigationActionListener);
+        btnNavPrevious.addActionListener(btnNavigationActionListener);
+        btnNavNext.addActionListener(btnNavigationActionListener);
+        btnNavLast.addActionListener(btnNavigationActionListener);
+    }
+    
+    private class BtnNavigationActionListener implements ActionListener
+    {
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+            
+            try {
+                // Initialize VxChartsBinGroups variables.
+                ArrayList<VxChartsBinGroup> vXChartsBinGroups = SmCore.getVxChartsBinGroups();
+                
+                if (vXChartsBinGroups.isEmpty())
+                    return;
+                
+                int vXChartsBinGroupsIndx = SmCore.getVxChartsBinGroupsIndx();
+
+                // Update vXChartsBinGroupsIndx.
+                if (evt.getActionCommand().trim().startsWith("First")) //First
+                {
+                    vXChartsBinGroupsIndx = 0;
+                    SmCore.setVxChartsBinGroupsIndx(vXChartsBinGroupsIndx);
+                }
+                else if (evt.getActionCommand().trim().startsWith("Previous")) //Previous
+                {
+                    if (vXChartsBinGroupsIndx > 0)
+                        SmCore.setVxChartsBinGroupsIndx(--vXChartsBinGroupsIndx);   
+                }
+                else if (evt.getActionCommand().trim().startsWith("Next")) //Next
+                {
+                    if (vXChartsBinGroupsIndx < vXChartsBinGroups.size()-1)
+                        SmCore.setVxChartsBinGroupsIndx(++vXChartsBinGroupsIndx);
+                }
+                else if (evt.getActionCommand().trim().startsWith("Last")) //Last
+                {
+                    vXChartsBinGroupsIndx = vXChartsBinGroups.size()-1;
+                    SmCore.setVxChartsBinGroupsIndx(vXChartsBinGroupsIndx);
+                }
+
+                // Update chart viewers.
+                SmCore.updateChartViewPanels();
+
+                // Update navigation control states.
+                if (vXChartsBinGroupsIndx == 0)
+                {
+                    btnNavFirst.setEnabled(false);
+                    btnNavPrevious.setEnabled(false);
+                }
+                else
+                {
+                    btnNavFirst.setEnabled(true);
+                    btnNavPrevious.setEnabled(true);
+                }
+
+                if (vXChartsBinGroupsIndx == vXChartsBinGroups.size()-1)
+                {
+                    btnNavNext.setEnabled(false);
+                    btnNavLast.setEnabled(false);
+                }
+                else
+                {
+                    btnNavNext.setEnabled(true);
+                    btnNavLast.setEnabled(true);
+                }
+
+                lblNavDisplay.setText("(" + (vXChartsBinGroupsIndx+1) + " of " + 
+                    vXChartsBinGroups.size() + ") " + 
+                    vXChartsBinGroups.get(vXChartsBinGroupsIndx).getGroupName());
+            }
+            catch (Exception ex) {
+                SmCore.addMsgToStatusViewer(ex.getMessage());
+            }
+        }
+    }
+
+    /**
+     * This method is called from within the constructor to initialize the form.
+     * WARNING: Do NOT modify this code. The content of this method is always
+     * regenerated by the Form Editor.
+     */
+    @SuppressWarnings("unchecked")
+    // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
+    private void initComponents() {
+
+        tbarNav = new javax.swing.JToolBar();
+        btnNavFirst = new javax.swing.JButton();
+        btnNavPrevious = new javax.swing.JButton();
+        btnNavNext = new javax.swing.JButton();
+        btnNavLast = new javax.swing.JButton();
+        filler1 = new javax.swing.Box.Filler(new java.awt.Dimension(28, 0), new java.awt.Dimension(28, 0), new java.awt.Dimension(28, 32767));
+        lblNavDisplay = new javax.swing.JLabel();
+
+        setOpaque(false);
+        setPreferredSize(new java.awt.Dimension(326, 20));
+
+        tbarNav.setFloatable(false);
+        tbarNav.setRollover(true);
+
+        btnNavFirst.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/nav_first_16.png"))); // NOI18N
+        org.openide.awt.Mnemonics.setLocalizedText(btnNavFirst, org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavFirst.text")); // NOI18N
+        btnNavFirst.setToolTipText(org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavFirst.toolTipText")); // NOI18N
+        btnNavFirst.setActionCommand(org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavFirst.actionCommand")); // NOI18N
+        btnNavFirst.setFocusable(false);
+        btnNavFirst.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        btnNavFirst.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        tbarNav.add(btnNavFirst);
+
+        btnNavPrevious.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/nav_previous_16.png"))); // NOI18N
+        org.openide.awt.Mnemonics.setLocalizedText(btnNavPrevious, org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavPrevious.text")); // NOI18N
+        btnNavPrevious.setToolTipText(org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavPrevious.toolTipText")); // NOI18N
+        btnNavPrevious.setActionCommand(org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavPrevious.actionCommand")); // NOI18N
+        btnNavPrevious.setFocusable(false);
+        btnNavPrevious.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        btnNavPrevious.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        tbarNav.add(btnNavPrevious);
+
+        btnNavNext.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/nav_next_16.png"))); // NOI18N
+        org.openide.awt.Mnemonics.setLocalizedText(btnNavNext, org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavNext.text")); // NOI18N
+        btnNavNext.setToolTipText(org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavNext.toolTipText")); // NOI18N
+        btnNavNext.setActionCommand(org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavNext.actionCommand")); // NOI18N
+        btnNavNext.setFocusable(false);
+        btnNavNext.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        btnNavNext.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        tbarNav.add(btnNavNext);
+
+        btnNavLast.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/nav_last_16.png"))); // NOI18N
+        org.openide.awt.Mnemonics.setLocalizedText(btnNavLast, org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavLast.text")); // NOI18N
+        btnNavLast.setToolTipText(org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavLast.toolTipText")); // NOI18N
+        btnNavLast.setActionCommand(org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.btnNavLast.actionCommand")); // NOI18N
+        btnNavLast.setFocusable(false);
+        btnNavLast.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        btnNavLast.setVerticalTextPosition(javax.swing.SwingConstants.BOTTOM);
+        tbarNav.add(btnNavLast);
+        tbarNav.add(filler1);
+
+        org.openide.awt.Mnemonics.setLocalizedText(lblNavDisplay, org.openide.util.NbBundle.getMessage(NavPanel.class, "NavPanel.lblNavDisplay.text")); // NOI18N
+        lblNavDisplay.setPreferredSize(new java.awt.Dimension(2, 25));
+        tbarNav.add(lblNavDisplay);
+
+        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
+        this.setLayout(layout);
+        layout.setHorizontalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addComponent(tbarNav, javax.swing.GroupLayout.DEFAULT_SIZE, 326, Short.MAX_VALUE)
+        );
+        layout.setVerticalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                .addGap(0, 0, Short.MAX_VALUE)
+                .addComponent(tbarNav, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE))
+        );
+    }// </editor-fold>//GEN-END:initComponents
+
+
+    // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JButton btnNavFirst;
+    private javax.swing.JButton btnNavLast;
+    private javax.swing.JButton btnNavNext;
+    private javax.swing.JButton btnNavPrevious;
+    private javax.swing.Box.Filler filler1;
+    private javax.swing.JLabel lblNavDisplay;
+    private javax.swing.JToolBar tbarNav;
+    // End of variables declaration//GEN-END:variables
+}

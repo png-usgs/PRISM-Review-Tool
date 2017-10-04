@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Prism_Graph_Template>
+  <Station>
+    <Station_Code></Station_Code>
+    <Description></Description>
+    <Network_Code></Network_Code>
+    <Epochs>
+        <Epoch start_utc="2000/01/01 00:00:00" end_utc="2000/12/31 23:59:59">
+            <Channels>
+                <Channel>
+                    <Seed></Seed>
+                    <L_Code></L_Code>
+                    <Location></Location>
+                    <Azimuth></Azimuth>
+                    <Inclination></Inclination>
+                    <Color r="34" g="139" b="34"/>
+                </Channel>
+            </Channels>
+        </Epoch>
+    </Epochs>
+  </Station>
+</Prism_Graph_Template>
