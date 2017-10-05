@@ -4,10 +4,12 @@ The PRISM Review Tool (PRT) is a desktop application used for performing manual 
 editing, and processing of COSMOS datasets. Multiple viewers and editors allow for
 handling both seismic and spectral trace data. Trace editing is performed using the
 trace's underlying V1 or V2 dataset. Committing trace editing changes will generate 
-new V2 and V3 datasets. The tool also enables the use of templates in order to
-sort and display trace data associated with channels for a specific station and a
-specific time period or epoch. The tool is user configurable with the user preferences
-persisted. 
+new V2 and V3 datasets. The tool also enables the use of templates in order to sort and 
+display trace data associated with channels for a specific station and a specific time 
+period or epoch. The tool is user configurable and all user preferences are persisted. 
+Note that the tool uses the PRISM software to handle COSMOS file handling and processing 
+tasks. Information about the PRISM software is available online at 
+https://earthquake.usgs.gov/research/software/prism. 
 
 PRT is platform-independent, coded in Java using the NetBeans IDE (version 8.2), and 
 open-source. To support use by earthquake engineers and scientists, PRT is easy to install 
