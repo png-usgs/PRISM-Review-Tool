@@ -16,7 +16,6 @@ package gov.usgs.smapp.smforms;
 
 import COSMOSformat.V1Component;
 import static SmConstants.VFileConstants.DATA_PHYSICAL_PARAM_CODE;
-import static SmConstants.VFileConstants.DELTA_T;
 import static SmConstants.VFileConstants.MSEC_TO_SEC;
 import static SmConstants.VFileConstants.V_UNITS_INDEX;
 import SmProcessing.V2ProcessGUI;
@@ -27,6 +26,7 @@ import gov.usgs.smapp.smchartingapi.SmCharts_API;
 import gov.usgs.smapp.smchartingapi.qcchart2d.GroupChartView;
 import gov.usgs.smapp.smchartingapi.qcchart2d.QCChart2D_API;
 import gov.usgs.smapp.smchartingapi.qcchart2d.SmChartView;
+import gov.usgs.smapp.smchartingapi.qcchart2d.SmDataCursor;
 import gov.usgs.smcommon.smclasses.SmChannel;
 import gov.usgs.smcommon.smclasses.SmEpoch;
 import gov.usgs.smcommon.smclasses.SmFile;
@@ -141,7 +141,6 @@ public class SmFilterEditor extends javax.swing.JDialog {
         
         // Initialize interface components.
         initInterface();
-        initChartViewerPanel();
         initChannelsTable();
         initEditorPanel();
         
@@ -202,11 +201,7 @@ public class SmFilterEditor extends javax.swing.JDialog {
     private void initInterface() {
         this.addWindowListener(new SmChartEditorWindowListener());
     }
-    
-    private void initChartViewerPanel() {
-        this.pnlViewerAcc.addMouseListener(new ChartViewerMouseListener());
-    }
-    
+   
     private void initChannelsTable() {
         
         this.tblChannels.setModel(new ChannelsTableModel());
@@ -243,12 +238,12 @@ public class SmFilterEditor extends javax.swing.JDialog {
         this.ftxtFilterRangeLow.setValue(this.initFilterRangeLow);
         this.ftxtFilterRangeHigh.setValue(this.initFilterRangeHigh);
 
-        // Set filter-related conrol listeners.
-        setFilterRangeTextFieldListeners(true);
-        setFilterRangeRadioButtonListeners(true);
+        // Set control listeners.
+        setTextFieldListeners(true);
+        setRadioButtonListeners(true);
     }
     
-    private void setFilterRangeTextFieldListeners(boolean add) {
+    private void setTextFieldListeners(boolean add) {
         if (add) {
             this.ftxtFilterRangeLow.addMouseListener(textFieldMouseListener);
             this.ftxtFilterRangeHigh.addMouseListener(textFieldMouseListener);
@@ -265,7 +260,7 @@ public class SmFilterEditor extends javax.swing.JDialog {
         }
     }
     
-    private void setFilterRangeRadioButtonListeners(boolean add) {
+    private void setRadioButtonListeners(boolean add) {
         if (add) {
             this.rbtnFilterRangeLow.addItemListener(rbtnTypeListener);
             this.rbtnFilterRangeHigh.addItemListener(rbtnTypeListener);
@@ -282,6 +277,13 @@ public class SmFilterEditor extends javax.swing.JDialog {
             // Set log time.
             SmTimeFormatter timer = new SmTimeFormatter();
             this.logTime = timer.getGMTdateTime();
+            
+            // Reset range text fields.
+            this.ftxtFilterRangeLow.setValue(this.initFilterRangeLow);
+            this.ftxtFilterRangeHigh.setValue(this.initFilterRangeHigh);
+
+            // Reset initial radio button selection.
+            this.rbtnFilterRangeLow.setSelected(true);
             
             // Create initial SmSeries array.
             ArrayList<SmSeries> smSeriesSpectralList = createSmSeriesSpectralList(this.v2ProcessGUIs);
@@ -305,6 +307,12 @@ public class SmFilterEditor extends javax.swing.JDialog {
             setFilterRangeTextField(this.ftxtFilterRangeLow,this.initFilterRangeLow);
             setFilterRangeTextField(this.ftxtFilterRangeHigh,this.initFilterRangeHigh);
             
+            // Set chart properties to ensure the currently bounded text field is set 
+            // according to the currently set filter range radio button.
+            setChartViewProperties(chartViews);
+            setChartViewProperties(chartViews);
+            
+            /*
             // Reset initial radio button selection.
             if (this.rbtnFilterRangeLow.isSelected()) {
                 this.rbtnFilterRangeHigh.setSelected(true);
@@ -313,6 +321,7 @@ public class SmFilterEditor extends javax.swing.JDialog {
             else {
                 this.rbtnFilterRangeLow.setSelected(true);
             }
+            */
             
             SmCore.addMsgToStatusViewer("Filter editor reset at: " + this.logTime);
         }
@@ -325,9 +334,9 @@ public class SmFilterEditor extends javax.swing.JDialog {
     
     private void setFilterRangeTextField(JFormattedTextField field, double value) {
         
-        // Turn off filter-related control listeners.
-        setFilterRangeTextFieldListeners(false);
-        setFilterRangeRadioButtonListeners(false);
+        // Turn off control listeners.
+        setTextFieldListeners(false);
+        setRadioButtonListeners(false);
         
         // Set the field value.
         field.setValue(value);
@@ -359,9 +368,9 @@ public class SmFilterEditor extends javax.swing.JDialog {
                 chartView.getSmDataCursor().drawMarker(value, 0);
         }
         
-        // Turn on filter-related control listeners.
-        setFilterRangeTextFieldListeners(true);
-        setFilterRangeRadioButtonListeners(true);
+        // Turn on control listeners.
+        setTextFieldListeners(true);
+        setRadioButtonListeners(true);
     }
     
     private File fetchV2File(File v1File) {
@@ -439,13 +448,19 @@ public class SmFilterEditor extends javax.swing.JDialog {
             final int startDateDay = rec.getIntHeaderValue(42);
             final int startTimeHr = rec.getIntHeaderValue(43);
             final int startTimeMin = rec.getIntHeaderValue(44);
-            final double startTimeSec = rec.getRealHeaderValue(29);
-            final int startSec = (int)Math.floor(startTimeSec);
-            final int startMs = (int) Math.round((startTimeSec-Math.floor(startTimeSec))*1000);
+            final double startTimeSec = rec.getRealHeaderValue(29); 
+            int startSec = (int)Math.floor(startTimeSec);
+            int startMs = (int)((startTimeSec-startSec) / MSEC_TO_SEC);
+
+            if (startMs >= 1000) {
+                startSec += 1;
+                startMs = 0;
+            }
 
             final DateTime startDateTime = new DateTime(startDateYr,
                 startDateMth,startDateDay,startTimeHr,startTimeMin,startSec,startMs);
-            final double deltaT = rec.getRealHeaderValue(DELTA_T);
+            //final double deltaT = rec.getRealHeaderValue(DELTA_T);
+            final double deltaT = v2ProcessGUI.getDTime()/MSEC_TO_SEC;
             final double maxVal = rec.getRealHeaderValue(63);
 
             ArrayList<SmPoint> smPoints = new ArrayList<>();
@@ -488,7 +503,7 @@ public class SmFilterEditor extends javax.swing.JDialog {
             // Get earliest, latest date times and min delta time.
             DateTime earliestStartTime = SmUtils.getEarliestStartTime(filePaths);
             DateTime latestStopTime = SmUtils.getLatestStopTime(filePaths);
-            double minDeltaT = SmUtils.getMinimumDeltaT(filePaths);
+            //double minDeltaT = SmUtils.getMinimumDeltaT(filePaths);
             
             // Retrieve network and station codes from the first list item.
             SmRec smRec1st = createSmRec(v2ProcessGUIs.get(0));
@@ -506,9 +521,11 @@ public class SmFilterEditor extends javax.swing.JDialog {
                     earliestStartTime, latestStopTime);
                 
                 // Create spectral data list.
+                //ArrayList<SmPoint> adjustedSmPointsFFT = SmRec.createSmPointsFFT(dataSeismic, 
+                    //minDeltaT, MSEC_TO_SEC);
                 ArrayList<SmPoint> adjustedSmPointsFFT = SmRec.createSmPointsFFT(dataSeismic, 
-                    minDeltaT, MSEC_TO_SEC);
-
+                    v2ProcessGUI.getDTime()/MSEC_TO_SEC, MSEC_TO_SEC);
+                
                 ArrayList<SmPoint> dataSpectral = new ArrayList<>();
 
                 for (int i=1; i<adjustedSmPointsFFT.size()/2; i++) //skip 1st point, frequency=0Hz
@@ -762,6 +779,7 @@ public class SmFilterEditor extends javax.swing.JDialog {
                     xAxisTitle,yAxisTitle,true,null);
                 
                 if (chartView != null) {
+                    chartView.addMouseListener(new SmChartViewMouseListener());
                     chartViews.add(chartView);
                     pnlViewerAcc.add(chartView);
                 }
@@ -1399,10 +1417,33 @@ public class SmFilterEditor extends javax.swing.JDialog {
         reset();
     }//GEN-LAST:event_btnResetActionPerformed
 
-    private class ChartViewerMouseListener extends MouseAdapter {
-        
+    private class SmChartViewMouseListener extends MouseAdapter {
         @Override
-        public void mouseClicked(MouseEvent e) {
+        public void mouseReleased(MouseEvent e) {
+
+            if (e.getSource() instanceof SmChartView) {
+                try {
+                    // Turn off text field listeners.
+                    setTextFieldListeners(false);
+                    
+                    // Fetch SmChartView and SmDataCursor objects.
+                    SmChartView scv = (SmChartView)e.getSource();
+                    SmDataCursor sdc = scv.getSmDataCursor();
+
+                    // Remove previously drawn numeric label.
+                    sdc.removeNumericLabel();
+
+                    // Draw marker.
+                    sdc.drawMarker(sdc.getLocation().getX(), 0);
+
+                    // Update bounded text field value.
+                    scv.setBoundedTextFieldValue(sdc.getLocation().getX());
+                }
+                finally {
+                    // Turn on text field listeners.
+                    setTextFieldListeners(true);
+                }
+            }
         }
     }
     

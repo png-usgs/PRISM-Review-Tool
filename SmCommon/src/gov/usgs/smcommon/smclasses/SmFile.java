@@ -190,17 +190,22 @@ public class SmFile {
                 final int startTimeHr = rec.getIntHeaderValue(43);
                 final int startTimeMin = rec.getIntHeaderValue(44);
                 final double startTimeSec = rec.getRealHeaderValue(29);
-                final int startSec = (int)Math.floor(startTimeSec);
-                final int startMs = (int) Math.round((startTimeSec-Math.floor(startTimeSec))*1000);
-               
+                
+                int startSec = (int)Math.floor(startTimeSec);
+                int startMs = (int)((startTimeSec-startSec) / MSEC_TO_SEC);
+                
+                if (startMs >= 1000) {
+                    startSec += 1;
+                    startMs = 0;
+                }
+                
                 final DateTime startDateTime = new DateTime(startDateYr,
                     startDateMth,startDateDay,startTimeHr,startTimeMin,startSec,startMs);
                 
-//                final double deltaT = rec.getRealHeaderValue(DELTA_T) * MSEC_TO_SEC;
                 final double deltaT = rec.getRealHeaderValue(DELTA_T);
 //                final double maxVal = rec.getRealHeaderValue(MAX_VAL);
                 final double maxVal = rec.getRealHeaderValue(63);
-
+                
                 ArrayList<SmPoint> smPoints = new ArrayList<>();
                 
                 if (fileDataType.equals(RAWACC)) {

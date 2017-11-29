@@ -174,94 +174,6 @@ public class SmRec {
     public int getDataUnitCode() {return this.dataUnitCode;}
 
     public void setDataUnitCode(int dataUnitCode) {this.dataUnitCode = dataUnitCode;}
-     
-    /**
-     * Returns an adjusted, padded array of SmPoint objects, where for each 
-     * SmPoint, the x value represents the time (in seconds) relative to the
-     * earliest start date time and the y value the recorded COSMOS data value.
-     * SmPoint objects are added to the array as necessary to pad the time between
-     * the earliest start date time and the record start date time and between the
-     * the record stop date time and the latest stop date time.
-     * date time difference.
-     * @param earliestStartDateTime
-     * @param latestStopDateTime
-     * @param minDeltaT
-     * @return ArrayList of SmPoints objects.
-     */
-    public ArrayList<SmPoint> createAdjustedSmPointsPaddedOld(DateTime earliestStartDateTime,
-        DateTime latestStopDateTime, double minDeltaT)
-    {
-        if (startDateTime.isAfter(endDateTime))
-            return null;
-        
-        if (earliestStartDateTime.isAfter(latestStopDateTime))
-            return null;
-        
-        double firstY = this.getSmPoints().get(0).getY();
-        double lastY = this.getSmPoints().get(this.getSmPoints().size()-1).getY();
-        
-        ArrayList<SmPoint> adjustedSmPoints = new ArrayList<>();
-        
-        int factor = (int) Math.round(this.getDeltaT()/minDeltaT);
-        
-        Duration durTimeRange = new Duration(earliestStartDateTime,latestStopDateTime);
-        double timeRangeMs = durTimeRange.getMillis();
-        long expectedNumPts = Math.round(timeRangeMs/minDeltaT)+1;
-        
-        long actualNumPts = 0;
-        double xVal = 0;
-        DateTime curDateTime;
-            
-        // Add points for period between earliest and record start DateTimes.
-        if (startDateTime.isAfter(earliestStartDateTime))
-        {
-            curDateTime = earliestStartDateTime;
-            
-            // Create points before record start DateTime.
-            while (curDateTime.isBefore(startDateTime))
-            {
-                adjustedSmPoints.add(new SmPoint(xVal*MSEC_TO_SEC,firstY));
-                xVal += minDeltaT;
-                curDateTime = curDateTime.plusMillis((int) Math.round(minDeltaT));
-                actualNumPts++;
-            }
-        }
-        
-        // Create points for period between record start and end DateTimes.
-        curDateTime = startDateTime;
-        for (SmPoint smPoint : this.getSmPoints())
-        {
-            for (int i=0; i<factor; i++)
-            {
-                adjustedSmPoints.add(new SmPoint(xVal*MSEC_TO_SEC,smPoint.getY()));
-                xVal += minDeltaT;
-                curDateTime = curDateTime.plusMillis((int) Math.round(minDeltaT));
-                actualNumPts++;
-            }
-        }
-        
-        // Create points for period between record end and latest DateTimes.
-        if (curDateTime.isBefore(latestStopDateTime))
-        {
-            while (!curDateTime.isAfter(latestStopDateTime))
-            {
-                adjustedSmPoints.add(new SmPoint(xVal*MSEC_TO_SEC,lastY));
-                xVal += minDeltaT;
-                curDateTime = curDateTime.plusMillis((int) Math.round(minDeltaT));
-                actualNumPts++;
-            }
-        }
-        
-        // Add additional points to equal adjusted number of points.
-        while (actualNumPts < expectedNumPts)
-        {
-            adjustedSmPoints.add(new SmPoint(xVal*MSEC_TO_SEC,lastY));
-            xVal += minDeltaT;
-            actualNumPts++;
-        }
-            
-        return adjustedSmPoints;
-    }
     
     /**
      * Returns an adjusted, padded array of SmPoint objects, where for each 
@@ -292,7 +204,8 @@ public class SmRec {
         
         Duration durTimeRange = new Duration(earliestStartDateTime,latestStopDateTime);
         double timeRangeMs = durTimeRange.getMillis();
-        long expectedNumPts = Math.round(timeRangeMs/deltaT)+1;
+        //long expectedNumPts = Math.round(timeRangeMs/deltaT)+1;
+        long expectedNumPts = ((long)(timeRangeMs/deltaT))+1;
         
         long actualNumPts = 0;
         double xVal = 0;
@@ -308,7 +221,8 @@ public class SmRec {
             {
                 adjustedSmPoints.add(new SmPoint(xVal*MSEC_TO_SEC,firstY));
                 xVal += deltaT;
-                curDateTime = curDateTime.plusMillis((int) Math.round(deltaT));
+                //curDateTime = curDateTime.plusMillis((int) Math.round(deltaT));
+                curDateTime = curDateTime.plusMillis((int)deltaT);
                 actualNumPts++;
             }
         }
@@ -319,7 +233,8 @@ public class SmRec {
         {
             adjustedSmPoints.add(new SmPoint(xVal*MSEC_TO_SEC,smPoint.getY()));
             xVal += deltaT;
-            curDateTime = curDateTime.plusMillis((int) Math.round(deltaT));
+            //curDateTime = curDateTime.plusMillis((int) Math.round(deltaT));
+            curDateTime = curDateTime.plusMillis((int)deltaT);
             actualNumPts++;
         }
         
@@ -330,7 +245,8 @@ public class SmRec {
             {
                 adjustedSmPoints.add(new SmPoint(xVal*MSEC_TO_SEC,lastY));
                 xVal += deltaT;
-                curDateTime = curDateTime.plusMillis((int) Math.round(deltaT));
+                //curDateTime = curDateTime.plusMillis((int) Math.round(deltaT));
+                curDateTime = curDateTime.plusMillis((int)deltaT);
                 actualNumPts++;
             }
         }

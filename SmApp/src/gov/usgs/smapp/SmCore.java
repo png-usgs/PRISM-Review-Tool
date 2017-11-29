@@ -1793,7 +1793,7 @@ public class SmCore {
                             if (!smRec.getEventName().isEmpty())
                                 sbEventDesc.append(" ").append(smRec.getEventName());
                         }
-                        
+            
                         SmCore.getVxChartsBinGroups().add(new VxChartsBinGroup(
                             groupName,sbStationDesc.toString(),sbEventDesc.toString(),
                             chartAPI,v1ChartsBin,v2ChartsBin));

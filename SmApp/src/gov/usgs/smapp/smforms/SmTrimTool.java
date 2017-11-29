@@ -138,20 +138,6 @@ public class SmTrimTool extends javax.swing.JFrame {
         initForm();
     }
     
-    public SmChartView getCurChartView() {
-        if (smChartViews != null) {
-            TraceSet traceSet = traceSets.get(traceSetsIndx);
-            int curTraceIndx = traceSet.getCurTraceIndx();
-            
-            if (curTraceIndx >= 0)
-                return smChartViews.get(curTraceIndx);
-            else
-                return null;
-        }
-        
-        return null;
-    }
-   
     private void initForm() {
         try
         {       
@@ -230,6 +216,20 @@ public class SmTrimTool extends javax.swing.JFrame {
             
         setTextFieldPropertyListeners(true);
         setRadioButtonListeners(true);
+    }
+    
+    public SmChartView getCurChartView() {
+        if (smChartViews != null) {
+            TraceSet traceSet = traceSets.get(traceSetsIndx);
+            int curTraceIndx = traceSet.getCurTraceIndx();
+            
+            if (curTraceIndx >= 0)
+                return smChartViews.get(curTraceIndx);
+            else
+                return null;
+        }
+        
+        return null;
     }
     
     private SmFile createV1SmFile(File file) {
@@ -421,8 +421,10 @@ public class SmTrimTool extends javax.swing.JFrame {
             Duration durStart = new Duration(origStartDateTime,startDateTime);
             Duration durStop = new Duration(newStopDateTime,origStopDateTime);
             
-            int startTrimCnt = Math.round(durStart.getMillis() / origDeltaT);
-            int stopTrimCnt = Math.round(durStop.getMillis() / origDeltaT);
+            //int startTrimCnt = Math.round(durStart.getMillis() / origDeltaT);
+            //int stopTrimCnt = Math.round(durStop.getMillis() / origDeltaT);
+            int startTrimCnt = (int)(durStart.getMillis() / origDeltaT);
+            int stopTrimCnt = (int)(durStop.getMillis() / origDeltaT);
             int totalTrimCnt = startTrimCnt + stopTrimCnt;
             int remainPtCnt = origNumPts - totalTrimCnt;
             
@@ -1236,7 +1238,8 @@ public class SmTrimTool extends javax.swing.JFrame {
                     SmFile smFile = new SmFile(new File(filePath));
                     ArrayList<SmRec> smRecs = smFile.getSmRecs();
                     double deltaT = smRecs.get(0).getDeltaT();
-                    long expectedNumPoints = Math.round(timeRangeMs / deltaT) + 1;
+                    //long expectedNumPoints = Math.round(timeRangeMs / deltaT) + 1;
+                    long expectedNumPoints = (long)((timeRangeMs / deltaT) + 1);
                     long actualNumPoints = 0;
                     
                     ArrayList<SmPoint> smPoints = new ArrayList<>();
@@ -1345,7 +1348,8 @@ public class SmTrimTool extends javax.swing.JFrame {
                     SmFile smFile = new SmFile(new File(filePath));
                     ArrayList<SmRec> smRecs = smFile.getSmRecs();
                     double deltaT = smRecs.get(0).getDeltaT();
-                    long expectedNumPoints = Math.round(timeRangeMs / deltaT) + 1;
+                    //long expectedNumPoints = Math.round(timeRangeMs / deltaT) + 1;
+                    long expectedNumPoints = (long)((timeRangeMs / deltaT) + 1);
                     long actualNumPoints = 0;
                     
                     ArrayList<SmPoint> smPoints = new ArrayList<>();
@@ -1455,8 +1459,10 @@ public class SmTrimTool extends javax.swing.JFrame {
             
             // Update current start and stop DateTime variables for current TraceSet.
             DateTime origStartDateTime = traceSet.getOrigStartDateTime();
-            DateTime newStartDateTime = origStartDateTime.plus(Duration.millis(Math.round(startTimeMs)));
-            DateTime newStopDateTime = origStartDateTime.plus(Duration.millis(Math.round(stopTimeMs)));
+            //DateTime newStartDateTime = origStartDateTime.plus(Duration.millis(Math.round(startTimeMs)));
+            //DateTime newStopDateTime = origStartDateTime.plus(Duration.millis(Math.round(stopTimeMs)));
+            DateTime newStartDateTime = origStartDateTime.plus(Duration.millis((long)(startTimeMs)));
+            DateTime newStopDateTime = origStartDateTime.plus(Duration.millis((long)(stopTimeMs)));
             
             traceSet.setCurStartDateTime(newStartDateTime);
             traceSet.setCurStopDateTime(newStopDateTime);
@@ -1960,6 +1966,7 @@ public class SmTrimTool extends javax.swing.JFrame {
                 
                 if (selChartViewIndx == traceSet.getCurTraceIndx()) {
                     try {
+                        // Turn off text field listeners.
                         setTextFieldPropertyListeners(false);
                     
                         // Remove previously drawn numeric label.
@@ -1972,6 +1979,7 @@ public class SmTrimTool extends javax.swing.JFrame {
                         scv.setBoundedTextFieldValue(sdc.getLocation().getX());
                     }
                     finally {
+                        // Turn on text field listeners.
                         setTextFieldPropertyListeners(true);
                     }
                 }

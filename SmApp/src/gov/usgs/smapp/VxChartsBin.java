@@ -85,6 +85,7 @@ public abstract class VxChartsBin {
         
         // Set member variables.
         if (filePaths != null && filePaths.size() > 0) {
+            
             SmFile smFile = new SmFile(new File(filePaths.get(0)));
             SmRec smRec = smFile.getSmRecs().get(0);
             

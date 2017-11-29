@@ -20,9 +20,7 @@ import COSMOSformat.V2Component;
 import COSMOSformat.V3Component;
 import SmConstants.VFileConstants;
 import static SmConstants.VFileConstants.CORACC;
-import static SmConstants.VFileConstants.DELTA_T;
 import static SmConstants.VFileConstants.DISPLACE;
-import static SmConstants.VFileConstants.MSEC_TO_SEC;
 import static SmConstants.VFileConstants.SPECTRA;
 import static SmConstants.VFileConstants.UNCORACC;
 import SmConstants.VFileConstants.V2DataType;
@@ -45,6 +43,7 @@ import gov.usgs.smapp.smchartingapi.qcchart2d.QCChart2D_API;
 import gov.usgs.smapp.smchartingapi.qcchart2d.SingleChartView;
 import gov.usgs.smapp.smchartingapi.qcchart2d.SingleChartView.LinePlotType;
 import gov.usgs.smapp.smchartingapi.qcchart2d.SmChartView;
+import gov.usgs.smapp.smchartingapi.qcchart2d.SmDataCursor;
 import gov.usgs.smcommon.smclasses.SmChannel;
 import gov.usgs.smcommon.smclasses.SmFile;
 import gov.usgs.smcommon.smclasses.SmGlobal;
@@ -87,9 +86,8 @@ import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.Hashtable;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
@@ -106,9 +104,7 @@ import javax.swing.JTable;
 import static javax.swing.ListSelectionModel.SINGLE_SELECTION;
 import javax.swing.SwingWorker;
 import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.DefaultTableColumnModel;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 import javax.swing.text.DefaultFormatterFactory;
@@ -146,7 +142,7 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
     private String channel;
     private String seed;
     private String lCode;
-    private double deltaT;
+    //private double deltaT;  //Delta Time in milliseconds
     
     private double initFunctionRangeStart;
     private double initFunctionRangeStop;
@@ -194,9 +190,9 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
     private BLF_ButtonState blfAcc;
     private BLF_ButtonState blfVel;
 
-    private Hashtable<String,SmMarker> accChartViewerMarkers;
-    private Hashtable<String,SmMarker> velChartViewerMarkers;
-    private Hashtable<String,SmMarker> disChartViewerMarkers;
+    private HashMap<String,SmMarker> accChartViewerMarkers;
+    private HashMap<String,SmMarker> velChartViewerMarkers;
+    private HashMap<String,SmMarker> disChartViewerMarkers;
     
     private V2ProcessState v2ProcessState;
     private boolean status = true;
@@ -321,7 +317,7 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
                 this.networkCode = textHeaders[4].substring(25, 27).trim();
                 this.stationCode = textHeaders[4].substring(28, 34).trim();
                 this.channel = rec.getChannel();
-                this.deltaT = rec.getRealHeaderValue(DELTA_T);
+                //this.deltaT = rec.getRealHeaderValue(DELTA_T);
                 
 //                Pattern p = Pattern.compile("^(\\w{3})(\\.)(\\w{2})$");
                 Pattern p = Pattern.compile("^(.{3})(\\.)(.{2})$");
@@ -401,7 +397,7 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
         // Set baseline function button state for ACC and VEL chart viewers.
         this.blfAcc = this.blfVel = BLF_ButtonState.Show;
         
-        // Initialize editior panel related variables to preference settings.
+        // Initialize editor panel related variables to preference settings.
         this.initFunctionRangeStart = SmPreferences.SmSeismicTraceEditor.getFunctionRangeStart();
         this.initFunctionRangeStop = SmPreferences.SmSeismicTraceEditor.getFunctionRangeStop();
         this.initApplicationRangeStart = SmPreferences.SmSeismicTraceEditor.getApplicationRangeStart();
@@ -523,20 +519,8 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
             // Set log time.
             SmTimeFormatter timer = new SmTimeFormatter();
             this.logTime = timer.getGMTdateTime();
-
-            // Adjust initial application range and event onset variables.
-            File v1File = v1SmFile.getFile();
-            File v2File = (v1File == null) ? null : fetchV2File(v1File);
-
-            if (v1File != null) {
-                this.xMax = calcXMax(v1File);
-                this.initApplicationRangeStop = this.xMax;
-            }
             
-            if (v2File != null) {
-                this.initEventOnset = fetchEventOnset(v2File);
-            }
-
+            // Reset markers.
             this.accChartViewerMarkers = null;
             this.velChartViewerMarkers = null;
             this.disChartViewerMarkers = null;
@@ -564,30 +548,38 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
             DefaultTableModel model = (DefaultTableModel)tblRecorder.getModel();
             model.setRowCount(0);
             
-            // Reset the width of second column in the recorder table.
-            //double factor = this.scrollpaneRecorder.getViewport().getWidth();
-            //double factor = this.scrollpaneRecorder.getPreferredSize().getWidth();
-            //this.tblRecorder.getColumnModel().getColumn(0).setPreferredWidth((int)(.30*factor));
-            //this.tblRecorder.getColumnModel().getColumn(1).setPreferredWidth((int)(.70*factor));
-
             // Reset V2ProcessGUI array, which should contain only one V2ProcessGUI 
             // object since there's only one record in V1 file. Future versions of
-            // V* files may contain more than one record, hence this is why an array
-            // is used.
+            // V* files may contain more than one record, which is why an array is used.
             this.v2ProcessGUIs = createV2ProcessGUIs(v1SmFile);
             
-            // Reset filter range values.
+            // Process v2ProcessGUI array to set initial filter range low and high 
+            // values and to output a message indicating whether V2ProcessGUI instance
+            // required re-sampling.
             for (V2ProcessGUI v2ProcessGUI : this.v2ProcessGUIs) {
+                this.initFilterRangeLow = v2ProcessGUI.getLowFilterCorner();
+                this.initFilterRangeHigh = v2ProcessGUI.getHighFilterCorner();
                 this.ftxtFilterRangeLow.setValue(v2ProcessGUI.getLowFilterCorner());
                 this.ftxtFilterRangeHigh.setValue(v2ProcessGUI.getHighFilterCorner());
                 
                 // Display result of re-sampling boolean indicator.
                 String msg = v2ProcessGUI.getResampleIndicator() ? 
-                    "V2 Re-sample Rate: " + v2ProcessGUI.getSampleRate() :
-                    "V2 Sample Rate: " + v2ProcessGUI.getSampleRate();
+                    "V2 Re-sample Rate: " : "V2 Sample Rate: ";
+                msg += v2ProcessGUI.getSampleRate() + " samples/sec" + 
+                    " (Delta Time: " + v2ProcessGUI.getDTime() + " sec)";
+                
                 SmCore.addMsgToStatusViewer(msg);
             }
-        
+            
+            // Set initial application range stop value to max x value.
+            this.xMax = calcXMax(v2ProcessGUIs);
+            this.initApplicationRangeStop = this.xMax;
+            this.ftxtApplicationRangeStop.setValue(this.xMax);
+            
+            // Set initial event onset.
+            this.initEventOnset = fetchEventOnset(v2ProcessGUIs);
+            this.ftxtEventOnset.setValue(fetchEventOnset(v2ProcessGUIs));
+            
             // Create seismic charts.
             createSeismicCharts(this.v2ProcessGUIs);
             
@@ -693,61 +685,20 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
         }
     }
     
-    private File fetchV2File(File v1File) {
-        // Build V1 filename string without file extension.
-        String fileName = v1File.getName();
-        String regExCosmosFileType = String.format("(?i)(^.+)([\\.](V[\\d][cC]?)$)");
-        Pattern p = Pattern.compile(regExCosmosFileType);
-        Matcher m = p.matcher(fileName);
-        
-        String baseFileName = "";
-        
-        if (m.find())
-            baseFileName = m.group(1);
-        
-        Path path = v1File.toPath();
-        String v2PathStr = path.getParent().getParent().toString() + 
-            File.separator + "V2";
-        File v2Dir = new File(v2PathStr);
-        
-        if (Files.isDirectory(v2Dir.toPath()))
-        {
-            File[] files = v2Dir.listFiles();
-            
-            for (File file : files) {
-                if (file.getName().startsWith(baseFileName)) {
-                    return file;
-                }
-            }
-        }
-        
-        return null;
-    }
-    
-    private double calcXMax(File v1File) {
+    private double calcXMax(ArrayList<V2ProcessGUI> v2ProcessGUIs) {
         double xMaxVal = 0;
         
         try {
-            String logDir = SmPreferences.General.getLogsDir();
             
-            SmQueue queue = new SmQueue(v1File,logTime,new File(logDir));
-            queue.readInFile(v1File);
-            queue.parseVFile(UNCORACC);
+            for (V2ProcessGUI v2ProcessGUI : v2ProcessGUIs) {
+                double[] pointsAcc = v2ProcessGUI.getAcceleration();
+                double xVal = v2ProcessGUI.getDTime()*(pointsAcc.length-1);
 
-            ArrayList<COSMOScontentFormat> smList = queue.getSmList();
-
-            for (COSMOScontentFormat rec : smList) {
-                if (rec instanceof V1Component) {
-                    V1Component v1Component = (V1Component)rec;
-                    double[] points = v1Component.getDataArray();
-                    double xVal = (this.deltaT*MSEC_TO_SEC)*(points.length-1);
-                    
-                    if (xVal > xMaxVal)
-                        xMaxVal = xVal;
-                }
+                if (xVal > xMaxVal)
+                    xMaxVal = xVal;
             }
         }
-        catch (IOException | FormatException | SmException ex ) {
+        catch (Exception ex ) {
             showMessage("Error",ex.getMessage(),
                 NotifyDescriptor.DEFAULT_OPTION,NotifyDescriptor.ERROR_MESSAGE);
             SmCore.addMsgToStatusViewer("Error: " + ex.getMessage());
@@ -756,45 +707,15 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
         return xMaxVal;
     }
     
-    private double fetchEventOnset(File v2File) {
+    private double fetchEventOnset(ArrayList<V2ProcessGUI> v2ProcessGUIs) {
         double eventOnset = 0;
         
         try {
-            String logDir = SmPreferences.General.getLogsDir();
-            
-            SmQueue queue = new SmQueue(v2File,logTime,new File(logDir));
-            
-            String fileName = v2File.getName();
-            String regExCosmosFileType = String.format("(?i)(^.+)([\\.](%s|%s|%s))([\\.](V[\\d][cC]?)$)",
-                SmGlobal.CosmosV2DataType.ACC.toString(),
-                SmGlobal.CosmosV2DataType.VEL.toString(),
-                SmGlobal.CosmosV2DataType.DIS.toString());
-            Pattern p = Pattern.compile(regExCosmosFileType);
-            
-            Matcher m = p.matcher(fileName);
-            
-            String fileDataType = "";
-            
-            if (m.find()) {
-                if (m.group(3).equalsIgnoreCase(SmGlobal.CosmosV2DataType.ACC.toString()))
-                    fileDataType = CORACC;
-                else if (m.group(3).equalsIgnoreCase(SmGlobal.CosmosV2DataType.VEL.toString()))
-                    fileDataType = VELOCITY;
-                else if (m.group(3).equalsIgnoreCase(SmGlobal.CosmosV2DataType.DIS.toString()))
-                    fileDataType = DISPLACE;
-            }
-            
-            queue.readInFile(v2File);
-            queue.parseVFile(fileDataType);
-
-            ArrayList<COSMOScontentFormat> smList = queue.getSmList();
-            
-            if (smList.size() > 0) {
-                V2Component v2Component = (V2Component)smList.get(0);
-                eventOnset = v2Component.extractEONSETfromComments();
+            for (V2ProcessGUI v2ProcessGUI : v2ProcessGUIs) {
+                eventOnset = v2ProcessGUI.getEventOnset();
             }
         }
-        catch (IOException | FormatException | SmException ex ) {
+        catch (Exception ex ) {
             showMessage("Error",ex.getMessage(),
                 NotifyDescriptor.DEFAULT_OPTION,NotifyDescriptor.ERROR_MESSAGE);
             SmCore.addMsgToStatusViewer("Error: " + ex.getMessage());
@@ -892,6 +813,9 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
                 createSeismicChart(v2PGUI,VFileConstants.V2DataType.DIS);
             }
             
+            // Add SmChartMouseListener to the charts.
+            addSmChartMouseListeners(this.chartViews);
+            
             // Set chart view properties.
             setChartViewProperties(this.chartViews);
         }
@@ -910,7 +834,8 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
             double xVal = 0;
             for (int i=0; i<points.length; i++){
                 smPoints.add(new SmPoint(xVal,points[i]));
-                xVal += this.deltaT*MSEC_TO_SEC;
+                //xVal += this.deltaT*MSEC_TO_SEC;
+                xVal += v2ProcessGUI.getDTime();
             }
                     
             SmCharts_API smCharts_API = (chartAPI.equals(SmGlobal.SM_CHARTS_API_QCCHART2D)) ?
@@ -1027,7 +952,8 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
             return;
         
         double[] inArr = v2ProcessGUI.getV2Array(v2DataType);
-        double dTime = this.deltaT*MSEC_TO_SEC;
+        //double dTime = this.deltaT*MSEC_TO_SEC;
+        double dTime = v2ProcessGUI.getDTime();
         VFileConstants.CorrectionOrder inCType;
         
         if (fName.equals(FunctionOption.MEAN.Name()))
@@ -1106,7 +1032,8 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
         else 
             return null;
         
-        double dTime = this.deltaT*MSEC_TO_SEC;
+        //double dTime = this.deltaT*MSEC_TO_SEC;
+        double dTime = v2ProcessGUI.getDTime();
         
         try {
             baseline = v2ProcessGUI.getBaselineFunction(inArr, dTime, fStart, fStop, cType);
@@ -1134,7 +1061,8 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
         
         try {
             for (V2ProcessGUI v2ProcessGUI_In : v2ProcessGUIs_In) {
-                double dTime = this.deltaT*MSEC_TO_SEC;
+                //double dTime = this.deltaT*MSEC_TO_SEC;
+                double dTime = v2ProcessGUI_In.getDTime();
                 v2ProcessGUI_In.setEventOnset(eventOnset, dTime);
                 
                 double[] baseline = getBaselineFunction(v2ProcessGUI_In,v2DataType,fStart,fStop,fName);
@@ -1188,10 +1116,11 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
         
         try {
             // Iterate V2ProcessGUI array to set event onset.
-            double dTime = this.deltaT*MSEC_TO_SEC;
+            //double dTime = this.deltaT*MSEC_TO_SEC;
             
             for (V2ProcessGUI v2ProcessGUI : v2ProcessGUIs) {
-                v2ProcessGUI.setEventOnset(eventOnset,dTime);
+                //v2ProcessGUI.setEventOnset(eventOnset,dTime);
+                v2ProcessGUI.setEventOnset(eventOnset, v2ProcessGUI.getDTime());
             }
             
             // Filter the V2ProcessGUI array.
@@ -1417,9 +1346,9 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
         this.correctedCnt = this.filteredCnt = 0;
         
         // Reset SmMarker lists.
-        accChartViewerMarkers = new Hashtable<>();
-        velChartViewerMarkers = new Hashtable<>();
-        disChartViewerMarkers = new Hashtable<>();
+        accChartViewerMarkers = new HashMap<>();
+        velChartViewerMarkers = new HashMap<>();
+        disChartViewerMarkers = new HashMap<>();
         
         // Run recorder steps from first to selected row.
         int selectedRowIndx = tblRecorder.getSelectedRow();
@@ -1560,29 +1489,28 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
                 return;
             
             // Set the marker list based on selected chart viewer.
-            Hashtable<String,SmMarker> tbl = null;
+            HashMap<String,SmMarker> map = null;
             
             // Add the marker to appropriate marker list.
             if (curChartViewer.getName().equals(this.pnlViewerAcc.getName())) 
-                tbl = this.accChartViewerMarkers;
+                map = this.accChartViewerMarkers;
             else if (curChartViewer.getName().equals(this.pnlViewerVel.getName()))
-                tbl = this.velChartViewerMarkers;
+                map = this.velChartViewerMarkers;
             else
-                tbl = this.disChartViewerMarkers;
+                map = this.disChartViewerMarkers;
             
             // Put marker in list.
-            tbl.put(smMarker.getMarkerType().toString(), smMarker);
+            map.put(smMarker.getMarkerType().toString(), smMarker);
             
             for (Component component : curChartViewer.getComponents()) {
                 if (component instanceof SingleChartView) {
                     SingleChartView chartView = (SingleChartView)component;
 
-                    // Draw all markers in corresponding marker list.
-                    Enumeration markers = tbl.elements();
-
-                    while (markers.hasMoreElements()) {
-                        smMarker = (SmMarker)markers.nextElement();
-
+                    // Draw markers.
+                    Iterator markers = map.values().iterator();
+                    while (markers.hasNext()) {
+                        smMarker = (SmMarker)markers.next();
+                        
                         // Draw marker.
                         chartView.setSmDataCursorStyle(smMarker.getMarkerStyle());
                         chartView.setSmDataCursorColor(smMarker.getMarkerColor());
@@ -1889,6 +1817,15 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
 
         // Set enable/disable state of filter button.
         //btnFilter.setEnabled(this.curChartViewer.getName().equals(pnlViewerAcc.getName()));
+    }
+    
+    private void addSmChartMouseListeners(ArrayList<SmChartView> chartViews) {
+        if (chartViews == null || chartViews.isEmpty())
+            return;
+        
+        for (SmChartView smChartView : chartViews) {
+            smChartView.addMouseListener(new SmChartViewMouseListener());
+        }
     }
     
     private void setChartViewProperties(ArrayList<SmChartView> chartViews) {
@@ -3473,6 +3410,43 @@ public class SmSeismicTraceEditor extends javax.swing.JFrame {
                 }
             }
             */
+        }
+    }
+    
+    private class SmChartViewMouseListener extends MouseAdapter {
+        
+        @Override
+        public void mouseReleased(MouseEvent e) {
+            if (e.getSource() instanceof SmChartView) {
+                SmChartView scv = (SmChartView)e.getSource();
+                SmDataCursor sdc = scv.getSmDataCursor();
+                
+                try {
+                    Object container = scv.getParent();
+                
+                    if (container instanceof JPanel) {
+                        JPanel pnl = (JPanel)container;
+                        JPanel curPnl = getCurrentChartViewer();
+
+                        if (curPnl.getName().equals(pnl.getName())) {
+                            // Remove previously drawn numeric label.
+                            sdc.removeNumericLabel();
+
+                            // Draw marker.
+                            scv.getSmDataCursor().drawMarker(sdc.getLocation().getX(), 0);
+
+                            // Update bounded text field value.
+                            scv.setBoundedTextFieldValue(sdc.getLocation().getX());
+                        }
+                        else {
+                            setCurrentChartViewer(pnl);
+                        }
+                    }
+                }
+                finally {
+                    
+                }
+            }
         }
     }
     

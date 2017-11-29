@@ -49,7 +49,6 @@ import javax.swing.JLabel;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.JTableHeader;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 import org.netbeans.api.settings.ConvertAsProperties;
@@ -212,6 +211,7 @@ public final class SmPropertiesViewerTC extends TopComponent
              
                 double meanZero = rec.getRealHeaderValue(MEAN_ZERO);
                 double deltaT = rec.getRealHeaderValue(DELTA_T) * MSEC_TO_SEC ;
+                double sampleRate = 1.0/deltaT;
                 double timeSeriesLen = rec.getRealHeaderValue(62);
 //                double timeSeriesLen = (dataLength-1) * deltaT;
 //                double maxVal = rec.getRealHeaderValue(MAX_VAL);
@@ -256,6 +256,7 @@ public final class SmPropertiesViewerTC extends TopComponent
                 properties.add(new SmProperty("    Data Unit Code", String.valueOf(dataUnitCode)));
                 properties.add(new SmProperty("    Mean Zero", String.valueOf(meanZero)));
                 properties.add(new SmProperty("    Delta Time", String.valueOf(deltaT) + " Sec"));
+                properties.add(new SmProperty("    Sample Rate", String.valueOf(sampleRate) + " Samples/Sec"));
                 properties.add(new SmProperty("    Time Series Length", String.valueOf(timeSeriesLen) + " Sec"));
                 properties.add(new SmProperty("    Max Value", String.valueOf(maxVal)));
                 properties.add(new SmProperty("    Max Value Time", String.valueOf(maxValTime) + " Sec"));
@@ -432,14 +433,20 @@ public final class SmPropertiesViewerTC extends TopComponent
             setToolTips();
         }
         
+        @SuppressWarnings("unchecked")
         private void setToolTips() {
-            if (table == null)
-                return;
-            
-            for (int i = 0; i < table.getColumnCount(); i++) {
-                TableColumn col = table.getColumnModel().getColumn(i);
-                String toolTip = col.getHeaderValue().toString();
-                tips.put(col, toolTip);
+            try {
+                if (table == null)
+                    return;
+
+                for (int i = 0; i < table.getColumnCount(); i++) {
+                    TableColumn col = table.getColumnModel().getColumn(i);
+                    String toolTip = col.getHeaderValue().toString();
+                    tips.put(col, toolTip);
+                }
+            }
+            catch (Exception ex) {
+                throw ex;
             }
         }
         

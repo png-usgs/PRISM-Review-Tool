@@ -16,8 +16,6 @@ package gov.usgs.smapp.smforms;
 
 import COSMOSformat.COSMOScontentFormat;
 import SmConstants.VFileConstants;
-import static SmConstants.VFileConstants.DELTA_T;
-import static SmConstants.VFileConstants.MSEC_TO_SEC;
 import static SmConstants.VFileConstants.UNCORACC;
 import SmConstants.VFileConstants.V2DataType;
 import SmControl.SmQueue;
@@ -160,7 +158,7 @@ public class SmSeismicTraceViewer extends javax.swing.JFrame {
             String networkCode = textHeaders[4].substring(25, 27).trim();
             String stationCode = textHeaders[4].substring(28, 34).trim();
             String channel = rec.getChannel();
-            double deltaT = rec.getRealHeaderValue(DELTA_T);
+            //double deltaT = rec.getRealHeaderValue(DELTA_T);
             String seed = "";
             String lCode = "";
 
@@ -177,7 +175,8 @@ public class SmSeismicTraceViewer extends javax.swing.JFrame {
             double xVal = 0;
             for (int i=0; i<points.length; i++){
                 smPoints.add(new SmPoint(xVal,points[i]));
-                xVal += deltaT*MSEC_TO_SEC;
+                //xVal += deltaT*MSEC_TO_SEC;
+                xVal += v2ProcessGUI.getDTime();
             }
                     
             SmCharts_API smCharts_API = (chartAPI.equals(SmGlobal.SM_CHARTS_API_QCCHART2D)) ?

@@ -59,7 +59,6 @@ public class V1ChartsBin extends VxChartsBin {
         DateTime earliestStartTime, DateTime latestStopTime, double minDeltaT,
         final SmTemplate smTemplate, final boolean adjustPoints, final Object owner)
     {
-        //super(chartAPI,filePaths,smTemplate,adjustPoints,owner);
         super(chartAPI,filePaths,earliestStartTime,latestStopTime,minDeltaT,
             smTemplate,adjustPoints,owner);
         padded = false;

@@ -43,6 +43,7 @@ import gov.usgs.smapp.smchartingapi.SmCharts_API;
 import gov.usgs.smapp.smchartingapi.qcchart2d.GroupChartView;
 import gov.usgs.smapp.smchartingapi.qcchart2d.QCChart2D_API;
 import gov.usgs.smapp.smchartingapi.qcchart2d.SmChartView;
+import gov.usgs.smapp.smchartingapi.qcchart2d.SmDataCursor;
 import gov.usgs.smcommon.smclasses.SmChannel;
 import gov.usgs.smcommon.smclasses.SmEpoch;
 import gov.usgs.smcommon.smclasses.SmFile;
@@ -107,6 +108,8 @@ import org.openide.NotifyDescriptor;
  */
 @SuppressWarnings({"rawtypes","unchecked"})
 public class SmFAS_Editor extends javax.swing.JFrame {
+    private final double EPSILON = 0.000001;
+    
     private final String chartAPI;
     private final ArrayList<SmFile> srcSmFiles;
     private final SmTemplate smTemplate;
@@ -114,7 +117,7 @@ public class SmFAS_Editor extends javax.swing.JFrame {
     
     private final DateTime earliestDateTime;
     private final DateTime latestDateTime;
-    private final double minDeltaT;
+    //private final double minDeltaT;
     
     private final JPopupMenu editPopupMenu;
     
@@ -177,14 +180,13 @@ public class SmFAS_Editor extends javax.swing.JFrame {
         // Set earliest and latest start times and minimum delta time.
         this.earliestDateTime = SmUtils.getEarliestStartTime(filePaths);
         this.latestDateTime = SmUtils.getLatestStopTime(filePaths);
-        this.minDeltaT = SmUtils.getMinimumDeltaT(filePaths);
+        //this.minDeltaT = SmUtils.getMinimumDeltaT(filePaths);
 
         // Create CCP popup menu.
         editPopupMenu = SmGUIUtils.createCCPPopupMenu();
         
         // Initialize interface components.
         initInterface();
-        initChartViewerPanels();
         initChannelsTable();
         initEditorPanel();
         
@@ -229,12 +231,6 @@ public class SmFAS_Editor extends javax.swing.JFrame {
     private void initInterface() {
         // Add window listener.
         this.addWindowListener(new SmChartEditorWindowListener());
-    }
-    
-    private void initChartViewerPanels() {
-        ChartViewerMouseListener listener = new ChartViewerMouseListener();
-        
-        this.pnlViewerAcc.addMouseListener(listener);
     }
     
     private void initChannelsTable() {
@@ -323,6 +319,9 @@ public class SmFAS_Editor extends javax.swing.JFrame {
             // Create V2ProcessGUI array.
             ArrayList<V2ProcessGUI> v2ProcessGUIs = createV2ProcessGUIs(this.v1SmFiles);
             
+            this.initFilterRangeLow = v2ProcessGUIs.get(0).getLowFilterCorner();
+            this.initFilterRangeHigh = v2ProcessGUIs.get(0).getHighFilterCorner();
+            
             // Create initial SmSeries array.
             ArrayList<SmSeries> smSeriesSpectralList = createSmSeriesSpectralList(v2ProcessGUIs);
             
@@ -340,8 +339,27 @@ public class SmFAS_Editor extends javax.swing.JFrame {
 
             // Update Chart Viewer.
             updateChartViewer(smSeriesSpectralList);
+            
+            // Reset filter range text fields.
+            setFilterRangeTextField(this.ftxtFilterRangeLow,this.initFilterRangeLow);
+            setFilterRangeTextField(this.ftxtFilterRangeHigh,this.initFilterRangeHigh);
+            
+            // Set chart properties to ensure the currently bounded text field is set 
+            // according to the currently set filter range radio button.
+            setChartViewProperties(chartViews);
+            
+            /*
+            // Reset initial radio button selection.
+            if (this.rbtnFilterRangeLow.isSelected()) {
+                this.rbtnFilterRangeHigh.setSelected(true);
+                this.rbtnFilterRangeLow.setSelected(true);
+            }
+            else {
+                this.rbtnFilterRangeLow.setSelected(true);
+            }
+            */
 
-            SmCore.addMsgToStatusViewer("Spectral chart (re)initialized at: " + this.logTime);
+            SmCore.addMsgToStatusViewer("FAS editor reset at: " + this.logTime);
         }
         catch (Exception ex) {
             showMessage("Error",ex.getMessage(),
@@ -486,167 +504,6 @@ public class SmFAS_Editor extends javax.swing.JFrame {
         }
         
         return v2Components;
-    }
-    
-    private ArrayList<V2ProcessGUI> createV2ProcessGUIs_Old(ArrayList<SmFile> v1SmFiles) 
-        throws Exception {
-                
-        int filterOrder = SmPreferences.PrismParams.getButterworthFilterOrder();
-        double threshold = SmPreferences.PrismParams.getStrongMotionThresholdPcnt();
-        double taperLength = SmPreferences.PrismParams.getButterworthFilterTaperLength();
-        
-        ArrayList<V2ProcessGUI> v2ProcessGUIs = new ArrayList<>();
-        
-        String rxBLC = 
-            "(?i)(^|<([AV])(BL[\\w]+)>)([\\s]*)" +
-            "(SF:[\\s]*([\\d]+.[\\d]+))(,[\\s]*)" +
-            "(EF:[\\s]*([\\d]+.[\\d]+))(,[\\s]*)" +
-            "(SA:[\\s]*([\\d]+.[\\d]+))(,[\\s]*)" +
-            "(EA:[\\s]*([\\d]+.[\\d]+))(,[\\s]*)" +
-            "(ORDER:[\\s]*([\\w]+))([\\s]*)";
-        Pattern pBLC = Pattern.compile(rxBLC);
-        
-        try {
-            for (SmFile v1SmFile : v1SmFiles) {
-                File v1File = v1SmFile.getFile();
-                
-                if (v1File == null)
-                    continue;
-                
-                File v2File = fetchV2AccFile(v1File);
-                
-                if (v2File != null) {
-                    SmFile v2SmFile = new SmFile(v2File);
-
-                    // Create V1 and V2 component lists.
-                    ArrayList<V1Component> v1Components = createV1Components(v1SmFile);
-                    ArrayList<V2Component> v2Components = createV2Components(v2SmFile);
-
-                    if (v1Components.isEmpty() || v2Components.isEmpty())
-                        continue;
-
-                    // Retrieve first element from V1 and V2 lists.
-                    V1Component v1Component = v1Components.get(0);
-                    V2Component v2Component = v2Components.get(0);
-
-                    // Extract event onset.
-                    double eventOnset = v2Component.extractEONSETfromComments();
-                    
-                    // Extract deltaT and convert to seconds.
-                    double deltaT = v2Component.getRealHeaderValue(DELTA_T);
-                    double dTime = deltaT*MSEC_TO_SEC;
-                    int diffOrder = SmPreferences.PrismParams.getDifferentialOrder();
-
-                    // Create V2ProcessGUI.
-                    V2ProcessGUI v2ProcessGUI = new V2ProcessGUI(v1Component,v1File,
-                        filterOrder,threshold,taperLength,eventOnset,diffOrder);
-
-                    // Create and initialize ABC-related variables.
-                    //double[] abcArr = null; //baseline function results
-                    int break1 = -999; //index value of EA from ABC1
-                    int break2 = -999; //index value of SA from ABC2
-                    
-                    // Apply baseline correction as annotated in comments.
-                    for (String comment : v2Component.getComments()) {
-                        Matcher m = pBLC.matcher(comment);
-                        if (m.find()) {
-                            String v2DataType = m.group(2); // V or A
-                            String blType = m.group(3);   // BLC or BLABC#, where # is a number
-                            double fStart = Double.parseDouble(m.group(6));
-                            double fStop = Double.parseDouble(m.group(9));
-                            double aStart = Double.parseDouble(m.group(12));
-                            double aStop = Double.parseDouble(m.group(15));
-                            String order = m.group(18);
-                            
-                            int aStartIndx = (int)(aStart / dTime);
-                            int aStopIndx = (int)(aStop / dTime);
-                            int aLength = aStopIndx-aStartIndx;
-                            
-                            // Get correction order type.
-                            VFileConstants.CorrectionOrder cType;
-                            if (order.equalsIgnoreCase(VFileConstants.CorrectionOrder.MEAN.toString()))
-                                cType = VFileConstants.CorrectionOrder.MEAN;
-                            else if (order.equalsIgnoreCase(VFileConstants.CorrectionOrder.ORDER1.toString()))
-                                cType = VFileConstants.CorrectionOrder.ORDER1;
-                            else if (order.equalsIgnoreCase(VFileConstants.CorrectionOrder.ORDER2.toString()))
-                                cType = VFileConstants.CorrectionOrder.ORDER2;
-                            else if (order.equalsIgnoreCase(VFileConstants.CorrectionOrder.ORDER3.toString()))
-                                cType = VFileConstants.CorrectionOrder.ORDER3;
-                            else if (order.equalsIgnoreCase(VFileConstants.CorrectionOrder.SPLINE.toString()))
-                                cType = VFileConstants.CorrectionOrder.SPLINE;
-                            else
-                                continue;
-
-                            // Perform baseline correction.
-                            if (blType.equals("BLC")) {
-                                if (v2DataType.equalsIgnoreCase("A")) {
-                                    double[] inArr = v2ProcessGUI.getV2Array(VFileConstants.V2DataType.ACC);
-                                    double[] baseline = v2ProcessGUI.getBaselineFunction(inArr, 
-                                        dTime, fStart, fStop, cType);
-
-                                    v2ProcessGUI = V2ProcessGUI.makeBaselineCorrection(V2DataType.ACC, 
-                                        baseline, v2ProcessGUI, dTime, aStart, aStop, false);
-                                    v2ProcessGUI.addBaselineProcessingStep(fStart, fStop, aStart, aStop, 
-                                        V2DataType.ACC, V2DataType.ACC, VFileConstants.BaselineType.BESTFIT, 
-                                        cType, cType, 0);
-
-                                    double[] vel = v2ProcessGUI.integrateAnArray(inArr, dTime, eventOnset);
-                                    double[] dis = v2ProcessGUI.integrateAnArray(vel, dTime, eventOnset);
-                                    v2ProcessGUI.setVelocity(vel);
-                                    v2ProcessGUI.setDisplacement(dis);
-                                }
-                                else if (v2DataType.equalsIgnoreCase("V")){
-                                    double[] inArr = v2ProcessGUI.getV2Array(VFileConstants.V2DataType.VEL);
-                                    double[] baseline = v2ProcessGUI.getBaselineFunction(inArr, 
-                                        dTime, fStart, fStop, cType);
-
-                                    //v2ProcessGUI.makeBaselineCorrection(inArr, baseline, dTime, aStart, aStop);
-                                    v2ProcessGUI = V2ProcessGUI.makeBaselineCorrection(V2DataType.VEL, 
-                                        baseline, v2ProcessGUI, dTime, aStart, aStop, false);
-                                    v2ProcessGUI.addBaselineProcessingStep(fStart, fStop, aStart, aStop, 
-                                        V2DataType.VEL, V2DataType.VEL, VFileConstants.BaselineType.BESTFIT, 
-                                        cType, cType, 0);
-
-                                    double[] dis = v2ProcessGUI.integrateAnArray(inArr, dTime, eventOnset);
-                                    double[] acc = ArrayOps.differentiate(inArr, dTime);
-                                    //double[] acc = ArrayOps.CentDiff(inArr, dTime);
-                                    v2ProcessGUI.setDisplacement(dis);
-                                    v2ProcessGUI.setAcceleration(acc);
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Add V2ProcessGUI object to list.
-                    v2ProcessGUIs.add(v2ProcessGUI);
-                }
-                else {
-                    // Create V1 and V2 component lists.
-                    ArrayList<V1Component> v1Components = createV1Components(v1SmFile);
-                    
-                    // Retrieve first element from V1 list.
-                    V1Component v1Component = v1Components.get(0);
-                    
-                    // Set Event Onset to taper length.
-                    //double eventOnset = taperLength;
-                    
-                    double eventOnset = 0;
-                    int diffOrder = SmPreferences.PrismParams.getDifferentialOrder();
-                    
-                    // Create V2ProcessGUI.
-                    V2ProcessGUI v2ProcessGUI = new V2ProcessGUI(v1Component,v1File,
-                        filterOrder,threshold,taperLength,eventOnset,diffOrder);
-                    
-                    // Add V2ProcessGUI object to list.
-                    v2ProcessGUIs.add(v2ProcessGUI);
-                }
-            }
-            
-            return v2ProcessGUIs;
-        }
-        catch (Exception ex) {
-            throw ex;
-        }
     }
     
     private ArrayList<V2ProcessGUI> createV2ProcessGUIs(ArrayList<SmFile> v1SmFiles) 
@@ -834,6 +691,47 @@ public class SmFAS_Editor extends javax.swing.JFrame {
         }
     }
     
+    private void setFilterRangeTextField(JFormattedTextField field, double value) {
+        
+        // Turn off control listeners.
+        setTextFieldListeners(false);
+        setRadioButtonListeners(false);
+        
+        // Set the field value.
+        field.setValue(value);
+
+        // Set the marker style, color, and width based on specified field (i.e., low or high).
+        SmPreferences.MarkerStyle markerStyle;
+        Color color;
+        double width;
+
+        if (field.getName().equals(this.ftxtFilterRangeLow.getName())) {
+            markerStyle = SmPreferences.SmFAS_Editor.getFilterRangeLowMarkerStyle();
+            color = new Color(SmPreferences.SmFAS_Editor.getFilterRangeLowMarkerColor());
+            width = SmPreferences.SmFAS_Editor.getFilterRangeLowMarkerWidth();
+        }
+        else {
+            markerStyle = SmPreferences.SmFAS_Editor.getFilterRangeHighMarkerStyle();
+            color = new Color(SmPreferences.SmFAS_Editor.getFilterRangeHighMarkerColor());
+            width = SmPreferences.SmFAS_Editor.getFilterRangeHighMarkerWidth();
+        }
+
+        // Draw marker.
+        for (SmChartView chartView : this.chartViews) {
+            chartView.setBoundedTextField(field);
+            chartView.setSmDataCursorStyle(markerStyle);
+            chartView.setSmDataCursorColor(color);
+            chartView.setSmDataCursorWidth(width);
+
+            if (value - 0 >= EPSILON)
+                chartView.getSmDataCursor().drawMarker(value, 0);
+        }
+        
+        // Turn on control listeners.
+        setTextFieldListeners(true);
+        setRadioButtonListeners(true);
+    }
+    
     private File fetchV2File(File v1File) {
         // Build V1 filename string without file extension.
         String fileName = v1File.getName();
@@ -940,12 +838,18 @@ public class SmFAS_Editor extends javax.swing.JFrame {
             final int startTimeHr = rec.getIntHeaderValue(43);
             final int startTimeMin = rec.getIntHeaderValue(44);
             final double startTimeSec = rec.getRealHeaderValue(29);
-            final int startSec = (int)Math.floor(startTimeSec);
-            final int startMs = (int) Math.round((startTimeSec-Math.floor(startTimeSec))*1000);
+            int startSec = (int)Math.floor(startTimeSec);
+            int startMs = (int)((startTimeSec-startSec) / MSEC_TO_SEC);
+
+            if (startMs >= 1000) {
+                startSec += 1;
+                startMs = 0;
+            }
 
             final DateTime startDateTime = new DateTime(startDateYr,
                 startDateMth,startDateDay,startTimeHr,startTimeMin,startSec,startMs);
-            final double deltaT = rec.getRealHeaderValue(DELTA_T);
+            //final double deltaT = rec.getRealHeaderValue(DELTA_T);
+            final double deltaT = v2ProcessGUI.getDTime()/MSEC_TO_SEC;
             final double maxVal = rec.getRealHeaderValue(63);
 
             ArrayList<SmPoint> smPoints = new ArrayList<>();
@@ -979,6 +883,7 @@ public class SmFAS_Editor extends javax.swing.JFrame {
         ArrayList<SmSeries> smSeriesSpectralList = new ArrayList<>();
     
         try {
+            /*
             // Create file path list.
             ArrayList<String> filePaths = new ArrayList<>();
             for (V2ProcessGUI v2ProcessGUI : v2ProcessGUIs) {
@@ -986,9 +891,10 @@ public class SmFAS_Editor extends javax.swing.JFrame {
             }
             
             // Get earliest, latest date times and min delta time.
-            //DateTime earliestDateTime = SmUtils.getEarliestDateTime(filePaths);
-            //DateTime latestDateTime = SmUtils.getLatestDateTime(filePaths);
-            //double minDeltaT = SmUtils.getMinimumDeltaT(filePaths);
+            DateTime earliestDateTime = SmUtils.getEarliestDateTime(filePaths);
+            DateTime latestDateTime = SmUtils.getLatestDateTime(filePaths);
+            double minDeltaT = SmUtils.getMinimumDeltaT(filePaths);
+            */
             
             // Retrieve network and station codes from the first list item.
             SmRec smRec1st = createSmRec(v2ProcessGUIs.get(0));
@@ -1006,8 +912,10 @@ public class SmFAS_Editor extends javax.swing.JFrame {
                     earliestDateTime, latestDateTime);
 
                 // Create spectral data list.
+                //ArrayList<SmPoint> adjustedSmPointsFFT = SmRec.createSmPointsFFT(dataSeismic, 
+                    //minDeltaT, MSEC_TO_SEC);
                 ArrayList<SmPoint> adjustedSmPointsFFT = SmRec.createSmPointsFFT(dataSeismic, 
-                    minDeltaT, MSEC_TO_SEC);
+                    v2ProcessGUI.getDTime()/MSEC_TO_SEC, MSEC_TO_SEC);
 
                 ArrayList<SmPoint> dataSpectral = new ArrayList<>();
 
@@ -1262,6 +1170,7 @@ public class SmFAS_Editor extends javax.swing.JFrame {
                     xAxisTitle,yAxisTitle,true,this);
                 
                 if (chartView != null) {
+                    chartView.addMouseListener(new SmChartViewMouseListener());
                     chartViews.add(chartView);
                     pnlViewerAcc.add(chartView);
                 }
@@ -1308,51 +1217,6 @@ public class SmFAS_Editor extends javax.swing.JFrame {
             chartView.setSmDataCursorStyle(markerStyle);
             chartView.setSmDataCursorColor(color);
             chartView.setSmDataCursorWidth(width);
-        }
-    }
-    
-    private ArrayList<V2ProcessGUI> createFilteredV2ProcessGUIList_Old() throws Exception {
-        
-        try {
-            // Get table model data.
-            ChannelsTableModel model = (ChannelsTableModel)tblChannels.getModel();
-            ArrayList<ChannelWidget> channelWidgets = model.getChannelWidgets();
-
-            // Create V2ProcessGUI array.
-            ArrayList<V2ProcessGUI> v2ProcessGUIs = new ArrayList<>();
-
-            for (ChannelWidget channelWidget : channelWidgets) {
-                if (this.rbtnApplyToSelectedChannels.isSelected()) {
-                    ChannelBox channelBox = channelWidget.getChannelBox();
-                    if (channelBox.getSelect()) {
-                        SmSeries smSeries = (SmSeries)channelWidget.getTag();
-                        V2ProcessGUI v2ProcessGUI = (V2ProcessGUI)smSeries.getTag();
-                        v2ProcessGUIs.add(v2ProcessGUI);
-                    }
-                }
-                else {
-                    SmSeries smSeries = (SmSeries)channelWidget.getTag();
-                    V2ProcessGUI v2ProcessGUI = (V2ProcessGUI)smSeries.getTag();
-                    v2ProcessGUIs.add(v2ProcessGUI);
-                }
-            }
-
-            // Filter acceleration data for each V2ProcessGUI object.
-            for (V2ProcessGUI v2ProcessGUI : v2ProcessGUIs) {
-                // Set filter corners.
-                double low = ((Number)this.ftxtFilterRangeLow.getValue()).doubleValue();
-                double high = ((Number)this.ftxtFilterRangeHigh.getValue()).doubleValue();
-                v2ProcessGUI.setLowFilterCorner(low);
-                v2ProcessGUI.setHighFilterCorner(high);
-                
-                // Call preview processing to apply filter.
-                v2ProcessGUI.previewProcessing(V2DataType.ACC);
-            }
-            
-            return v2ProcessGUIs;
-        }
-        catch (Exception ex ) {
-            throw ex;
         }
     }
     
@@ -2356,10 +2220,33 @@ public class SmFAS_Editor extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_btnFilterSelectActionPerformed
 
-    private class ChartViewerMouseListener extends MouseAdapter {
-        
+    private class SmChartViewMouseListener extends MouseAdapter {
         @Override
-        public void mouseClicked(MouseEvent e) {
+        public void mouseReleased(MouseEvent e) {
+
+            if (e.getSource() instanceof SmChartView) {
+                try {
+                    // Turn off text field listeners.
+                    setTextFieldListeners(false);
+                    
+                    // Fetch SmChartView and SmDataCursor objects.
+                    SmChartView scv = (SmChartView)e.getSource();
+                    SmDataCursor sdc = scv.getSmDataCursor();
+
+                    // Remove previously drawn numeric label.
+                    sdc.removeNumericLabel();
+
+                    // Draw marker.
+                    sdc.drawMarker(sdc.getLocation().getX(), 0);
+
+                    // Update bounded text field value.
+                    scv.setBoundedTextFieldValue(sdc.getLocation().getX());
+                }
+                finally {
+                    // Turn on text field listeners.
+                    setTextFieldListeners(true);
+                }
+            }
         }
     }
     

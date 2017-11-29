@@ -22,6 +22,7 @@ import com.quinncurtis.chart2djava.DataCursor;
 import com.quinncurtis.chart2djava.GraphObj;
 import com.quinncurtis.chart2djava.Marker;
 import com.quinncurtis.chart2djava.NumericLabel;
+import gov.usgs.smapp.smforms.SmFAS_Editor;
 import gov.usgs.smapp.smforms.SmSeismicTraceEditor;
 import gov.usgs.smapp.smforms.SmTrimTool;
 import java.awt.Color;
@@ -46,6 +47,22 @@ public class SmDataCursor extends DataCursor {
         super(chartview, transform, nMarkerType, rSize);
     }
     
+    public void drawNumericLabel(double x, double y) {
+        // Remove previously drawn label.
+        removeNumericLabel();
+        
+        Font font = new Font("SansSerif", Font.PLAIN,10);
+        NumericLabel label = new NumericLabel(getChartObjScale(),font,
+            x, x, y, PHYS_POS, DECIMALFORMAT, 4);
+        // Nudge text to the right and up
+        label.setTextNudge(5,-5);
+        
+        // Add marker to chart.
+        ChartView chartView = getChartObjComponent();
+        chartView.addChartObject(label);
+        chartView.updateDraw();
+    }
+    
     public void removeNumericLabel() {
         ChartView chartView = getChartObjComponent();
         Vector<GraphObj> chartObjects = chartView.getChartObjectsVector();
@@ -60,22 +77,6 @@ public class SmDataCursor extends DataCursor {
                 break;
             }
         }
-        chartView.updateDraw();
-    }
-    
-    public void drawNumericLabel(double x, double y) {
-        // Remove previously drawn label.
-        removeNumericLabel();
-        
-        Font font = new Font("SansSerif", Font.PLAIN,10);
-        NumericLabel label = new NumericLabel(getChartObjScale(),font,
-            x, x, y, PHYS_POS, DECIMALFORMAT, 4);
-        // Nudge text to the right and up
-        label.setTextNudge(5,-5);
-        
-        // Add marker to chart.
-        ChartView chartView = getChartObjComponent();
-        chartView.addChartObject(label);
         chartView.updateDraw();
     }
     
@@ -251,23 +252,31 @@ public class SmDataCursor extends DataCursor {
             }
             else {
                 super.mouseDragged(event);
+                
+                // Draw numeric label.
+                drawNumericLabel(location.getX(),location.getY());
+                
+                // Draw marker.
+                chartView.getSmDataCursor().drawMarker(location.getX(), 0);
             }
         }
-        catch (Throwable e )
+        catch (Throwable e)
         {
         }
     }
 
-    // override mouseReleased method in order to add stuff
     @Override
     public void mouseReleased (MouseEvent event)
     {  
         try
-        {
-            super.mouseReleased(event);
+        {  
+            //super.mouseReleased(event);
             
             if ((event.getModifiers() & getButtonMask() ) != 0)
             {
+                super.mouseReleased(event);
+                
+                /*
                 // Get parent SmChartView and its owner.
                 SmChartView chartView = (SmChartView)getChartObjComponent();
                 Object owner = chartView.getOwner();
@@ -296,19 +305,7 @@ public class SmDataCursor extends DataCursor {
                         }
                     }
                 }
-                else if (owner instanceof SmTrimTool) {
-                    // Handle event from parent chart view.
-                }
-                else {
-                    // Remove previously drawn numeric label.
-                    removeNumericLabel();
-
-                    // Draw marker.
-                    chartView.getSmDataCursor().drawMarker(location.getX(), 0);
-
-                    // Update bounded text field value.
-                    chartView.setBoundedTextFieldValue(location.getX());
-                }
+                */
             }
         }
         catch (Throwable e)
